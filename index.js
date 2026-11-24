@@ -26,6 +26,49 @@ function getTransporter() {
 
 app.post("/api/contact", async (req, res) => {
   const payload = req.body || {};
+
+  // The profile email button sends this lightweight payload. Deliver the
+  // click notification to the configured site inbox; the supplied email is
+  // included as context and is not used as an arbitrary SMTP recipient.
+  if (Array.isArray(payload.path)) {
+    const email = typeof payload.email === "string" ? payload.email.trim() : "";
+    const lang = typeof payload.lang === "string" ? payload.lang.trim() : "";
+    const path = payload.path.filter((part) => typeof part === "string").map((part) => part.trim());
+    const website = typeof payload.company_website === "string" ? payload.company_website.trim() : "";
+
+    // Treat the hidden website field as a honeypot and return a success
+    // response without sending mail when a bot fills it in.
+    if (website) return res.status(200).json({ message: "Email request received" });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Valid email address is required", fields: ["email"] });
+    }
+    if (!path.length || path.length !== payload.path.length || path.some((part) => !part)) {
+      return res.status(400).json({ error: "A valid path is required", fields: ["path"] });
+    }
+
+    const transporter = getTransporter();
+    if (!transporter) {
+      return res.status(503).json({ error: "Email service is not configured" });
+    }
+
+    const recipient = process.env.CONTACT_TO || process.env.SMTP_USER;
+    const pathText = path.join(" / ");
+    try {
+      await transporter.sendMail({
+        from: `Website Enquiry <${process.env.SMTP_USER}>`,
+        to: recipient,
+        replyTo: email,
+        subject: `Email request from ${pathText}`,
+        text: `A visitor used the email button.\n\nEmail: ${email}\nLanguage: ${lang || "unspecified"}\nPath: ${pathText}`,
+        html: `<h2>Email button clicked</h2><p><strong>Email:</strong> ${escapeHtml(email)}</p><p><strong>Language:</strong> ${escapeHtml(lang || "unspecified")}</p><p><strong>Path:</strong> ${escapeHtml(pathText)}</p>`,
+      });
+      return res.status(200).json({ message: "Email request sent successfully" });
+    } catch (error) {
+      console.error("Email request send failed:", error.message);
+      return res.status(502).json({ error: "Could not send email request" });
+    }
+  }
+
   const values = Object.fromEntries(
     requiredFields.map((field) => [field, typeof payload[field] === "string" ? payload[field].trim() : ""]),
   );

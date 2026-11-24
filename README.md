@@ -48,3 +48,29 @@ console.log(result);
 ```
 
 On success the API returns `200` with `{ "message": "Contact email sent successfully" }`. Missing or invalid fields return `400`; SMTP configuration or delivery failures return `503` or `502`.
+
+## Email button click
+
+The same endpoint accepts the payload sent by the profile email button. It sends a notification to `CONTACT_TO` (or `SMTP_USER` if `CONTACT_TO` is omitted), with the supplied email set as `replyTo`:
+
+```json
+{
+  "company_website": "",
+  "email": "sridharbathula2002@gmail.com",
+  "lang": "en",
+  "path": ["attendee", "talks", "abu-dhabi"]
+}
+```
+
+```js
+await fetch("https://lynqconnect-b.vercel.app/api/contact", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    company_website: "",
+    email: "sridharbathula2002@gmail.com",
+    lang: "en",
+    path: ["attendee", "talks", "abu-dhabi"]
+  })
+});
+```
